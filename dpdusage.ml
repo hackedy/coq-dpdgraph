@@ -37,9 +37,13 @@ let spec_args = [
 ]
 
 let is_admit n =
-    match Node.bool_attrib "body" n with
-    | Some true -> false
-    | _ -> true
+    if Node.get_attrib "kind" n = Some "cnst"
+    then
+        match Node.bool_attrib "body" n, Node.bool_attrib "prop" n with
+        | Some true, _ -> false
+        | _, Some true -> true
+        | _, _ -> false
+    else false
 
 let print_usage g t =
   let print_node n =
