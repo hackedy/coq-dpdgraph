@@ -36,17 +36,22 @@ let spec_args = [
       ": print version and exit");
 ]
 
+let is_admit n =
+    match Node.bool_attrib "body" n with
+    | Some true -> false
+    | _ -> true
+
 let print_usage g t =
   let print_node n =
     let d = (G.in_degree g n) in
-    if d <= t then
+    if d >= t && is_admit n then
       if !print_path_option then
         let prefix = match Node.get_attrib "path" n with
           | None -> ""
           | Some d -> d^":"
-        in Format.printf "%s%s\t(%d)\n" prefix (Node.name n) d
+        in Format.printf "%d %s%s\n" d prefix (Node.name n)
       else
-        Format.printf "%s\t(%d)\n" (Node.name n) d
+        Format.printf "%d %s\n" d (Node.name n)
   in
   G.iter_vertex print_node g
 
