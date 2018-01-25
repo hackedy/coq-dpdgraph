@@ -22,10 +22,11 @@ BINDIR=@BINDIR@
 DPDPLUGIN=./dpdgraph.vo
 DPD2DOT=./dpd2dot
 DPDUSAGE=./dpdusage
+DPDALL=./dpdall
 
 INCLUDES = -I @OCAMLGRAPH_PATH@
 
-all : $(DPDPLUGIN) $(DPD2DOT) $(DPDUSAGE)
+all : $(DPDPLUGIN) $(DPD2DOT) $(DPDUSAGE) $(DPDALL)
 
 DISTRIBUTED = $(PRE)_compute.ml $(PRE)_dot.ml \
        $(PRE)_parse.mly  $(PRE)_lex.mll $(PRE)2dot.ml $(PRE)usage.ml
@@ -36,11 +37,13 @@ ML_COMMON = version.ml $(PRE)_compute.ml $(PRE)_dot.ml \
           $(PRE)_parse.ml  $(PRE)_lex.ml
 ML_DPD2DOT = $(PRE)2dot.ml
 ML_DPDUSAGE = $(PRE)usage.ml
+ML_DPDALL = $(PRE)all.ml
 
-ML_ALL = $(ML_COMMON) $(ML_DPD2DOT) $(ML_DPDUSAGE)
+ML_ALL = $(ML_COMMON) $(ML_DPD2DOT) $(ML_DPDUSAGE) $(ML_DPDALL)
 
 CMOS_DPD2DOT=$(ML_COMMON:%.ml=%.cmo) $(ML_DPD2DOT:%.ml=%.cmo)
 CMOS_DPDUSAGE=$(ML_COMMON:%.ml=%.cmo) $(ML_DPDUSAGE:%.ml=%.cmo)
+CMOS_DPDALL=$(ML_COMMON:%.ml=%.cmo) $(ML_DPDALL:%.ml=%.cmo)
 CMXS=$(ML_ALL:%.ml=%.cmx)
 
 OCAMLC=@OCAMLC@
@@ -65,7 +68,7 @@ DISTRIBUTED+=Make
 
 install : Make_coq
 	$(MAKE) -f $< install
-	cp dpd2dot dpdusage $(BINDIR)/
+	cp dpd2dot dpdusage dpdall $(BINDIR)/
 
 $(DPDPLUGIN) : Make_coq $(DISTRIBUTED)
 	$(ECHO_CIBLE)
@@ -91,6 +94,10 @@ $(DPD2DOT) : $(CMOS_DPD2DOT)
 $(DPDUSAGE) : $(CMOS_DPDUSAGE)
 	$(ECHO_CIBLE)
 	$(OCAMLC) -g $(INCLUDES) -o $@ graph.cma $(CMOS_DPDUSAGE)
+
+$(DPDALL) : $(CMOS_DPDALL)
+	$(ECHO_CIBLE)
+	$(OCAMLC) -g $(INCLUDES) -o $@ graph.cma $(CMOS_DPDALL)
 
 %.cmo : %.ml
 	$(ECHO_CIBLE)
