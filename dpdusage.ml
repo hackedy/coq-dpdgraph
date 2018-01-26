@@ -36,19 +36,10 @@ let spec_args = [
       ": print version and exit");
 ]
 
-let is_admit n =
-    if Node.get_attrib "kind" n = Some "cnst"
-    then
-        match Node.bool_attrib "body" n, Node.bool_attrib "prop" n with
-        | Some true, _ -> false
-        | _, Some true -> true
-        | _, _ -> false
-    else false
-
 let print_usage g t =
   let print_node n =
     let d = (G.in_degree g n) in
-    if d >= t && is_admit n then
+    if d >= t && Dpd_compute.is_admit n then
       if !print_path_option then
         let prefix = match Node.get_attrib "path" n with
           | None -> ""

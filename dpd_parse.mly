@@ -40,7 +40,8 @@ obj :
               raise (Dpd_compute.Error err)
             }
 
-node : NODE NUM STRING opt_attribs { Dpd_compute.N ($2, $3, $4) }
+    node : NODE NUM STRING opt_attribs {
+        Dpd_compute.N ($2, $3, $4, Dpd_compute.SSet.empty ()) }
 
 edge : EDGE NUM NUM opt_attribs { Dpd_compute.E ($2, $3, $4) }
 

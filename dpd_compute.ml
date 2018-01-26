@@ -31,6 +31,38 @@ type error =
 
 exception Error of error
 
+module type ISet =
+    sig
+        type elt
+        type t
+
+        val empty : unit -> t
+        val add : t -> elt -> unit
+        val add_all : t -> t -> unit
+        val size : t -> int
+    end
+
+module MakeISet(Ord: Set.OrderedType)
+    : ISet with type elt = Ord.t =
+    struct
+        type elt = Ord.t
+        type t = (elt, unit) Hashtbl.t
+
+        let empty () = Hashtbl.create 10
+
+        let add set elem =
+            Hashtbl.replace set elem ()
+
+        let add_all set src =
+            Hashtbl.iter (fun k _v -> add set k) src
+
+        let size set =
+            Hashtbl.length set
+
+    end
+
+module SSet = MakeISet(String)
+
 let pp_lex_pos fmt p = Format.fprintf fmt "(line:%d, character:%d)"
                          p.Lexing.pos_lnum
                          (p.Lexing.pos_cnum - p.Lexing.pos_bol)
@@ -77,11 +109,12 @@ let bool_attrib a attribs = match get_attrib a attribs with
   | None -> None
 
 module Node = struct
-  type t = int * string * (string * string) list
+  type t = int * string * (string * string) list * SSet.t
 
-  let id (id, _, _) = id
-  let name (_, name, _) = name
-  let attribs (_, _, attribs) = attribs
+  let id (id, _, _, _) = id
+  let name (_, name, _, _) = name
+  let attribs (_, _, attribs, _) = attribs
+  let support (_, _, _, supp) = supp
 
   let get_attrib a n = get_attrib a (attribs n)
   let bool_attrib a n = bool_attrib a (attribs n)
@@ -101,6 +134,48 @@ module Edge = struct
 end
 module G = Graph.Imperative.Digraph.ConcreteLabeled(Node)(Edge)
 
+module NSet = Set.Make(Node)
+
+let preds g n =
+    let f a b =
+        NSet.add a b
+    in
+    G.fold_pred f g n NSet.empty
+
+let filter_nodes f g =
+    let add_if_fv v s =
+        if f v
+        then NSet.add v s
+        else s
+    in
+    G.fold_vertex add_if_fv g NSet.empty
+
+let is_admit n =
+    if Node.get_attrib "kind" n = Some "cnst"
+    then
+        match Node.bool_attrib "body" n, Node.bool_attrib "prop" n with
+        | Some true, _ -> false
+        | _, Some true -> true
+        | _, _ -> false
+    else false
+
+let compute_support graph =
+    let rec accumulate_admits admit_name next_nodes =
+        let go n set =
+            SSet.add (Node.support n) admit_name;
+            NSet.union set (preds graph n)
+        in
+            if NSet.cardinal next_nodes = 0
+            then ()
+            else
+                let next_nodes' = NSet.fold go next_nodes NSet.empty in
+                accumulate_admits admit_name next_nodes'
+    in
+    let acc a = accumulate_admits (Node.name a) (NSet.singleton a) in
+    let admits = filter_nodes is_admit graph in
+    NSet.iter acc admits
+
+
 
 type t_obj = N of Node.t | E of (int * int * (string * string) list)
 
@@ -112,7 +187,7 @@ let build_graph lobj =
     with Not_found -> raise (Error (EdgeWithoutNode id))
   in
   let add_obj o = match o with
-    | N ((id, _, _) as n) ->
+    | N ((id, _, _, _) as n) ->
       begin
         try
           let old_n = Hashtbl.find node_tbl id in
@@ -124,10 +199,10 @@ let build_graph lobj =
     | E (id1, id2, attribs) ->
         let e = G.E.create (get_node id1) attribs (get_node id2) in
         G.add_edge_e g e
-  in List.iter add_obj lobj;
-    g
-
-
+  in
+  List.iter add_obj lobj;
+  compute_support g;
+  g
 
 (** remove edge (n1 -> n2) iff n2 is indirectly reachable by n1,
  * or if n1 and n2 are the same *)

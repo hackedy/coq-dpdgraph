@@ -15,7 +15,17 @@ let set_out_file file = out_file := Some file
 let graphname = ref None
 let set_graphname name = graphname := Some name
 
+let depth = ref None
+let set_depth i = depth := Some i
+
+let root = ref None
+let set_root r = root := Some r
+
 let spec_args = [
+  ("-root", Arg.String set_root,
+      ": root node for BFS traversal");
+  ("-depth", Arg.Int set_depth,
+      ": max depth of BFS traversal");
   ("-o", Arg.String set_out_file,
       ": name of output file (default: name of input file .dot)");
   ("-with-defs", Arg.Set Dpd_compute.with_defs,
@@ -49,6 +59,10 @@ let do_file n f =
       | None -> (Filename.chop_extension f)
       | Some name -> name
     in
+    match !root, !depth with
+    | Some r, Some d ->
+      Dpd_dot.graph_file_bfs graph_name dotfile g r d
+    | _, _ ->
       Dpd_dot.graph_file graph_name dotfile g
   with Dpd_compute.Error err -> Dpd_compute.pp_error err
 

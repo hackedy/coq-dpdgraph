@@ -70,7 +70,8 @@ let node_attribs g n =
   let attr = (Aid "fillcolor", Acolor color) :: attr in
   let used = List.length (G.pred g n) > 0 in
   let attr = if used then attr else (Aid "peripheries", Aint 3) :: attr in
-  let label = String.escaped (Node.name n) in
+  let admits = Dpd_compute.SSet.size (Node.support n) in
+  let label = String.escaped (Node.name n) ^ ": " ^ (string_of_int admits) in
   let url = mk_url n in
   let attr = (Aid "URL", Aurl url)::attr in
   let attr = (Aid "label", Astr label)::attr in
@@ -180,6 +181,63 @@ let print_graph name fmt graph =
   print_subgraphs fmt subgraphs;
   Format.fprintf fmt "} /* END */@."
 
+let find_vertex_by_name graph name =
+    let has_name vtx acc =
+        match acc with
+        | Some n -> Some n
+        | None ->
+            if name = Node.name vtx
+            then Some vtx
+            else None
+    in
+    G.fold_vertex has_name graph None
+
+let print_graph_from name fmt graph root depth =
+  let subgraphs = Hashtbl.create 7 in
+  let print_node n =
+     let attribs = node_attribs graph n in
+       Format.fprintf fmt "%s [%a] ;@."
+         (node_dot_id n) (print_attribs ", ") attribs;
+     let _ = match Node.get_attrib "path" n with None | Some "" -> ()
+       | Some d -> add_node_in_subgraph subgraphs n d
+    in ()
+  in
+  let print_edge e =
+    let edge_attribs = [] in
+    (* let edge_attribs = (Aid "style", Aid "bold")::edge_attribs in *)
+    Format.fprintf fmt "  %s -> %s [%a] ;@."
+      (node_dot_id (G.E.src e)) (node_dot_id (G.E.dst e))
+      (print_attribs ", ") edge_attribs
+  in
+  let escaped_name =
+    if (String.compare name "graph" = 0) ||
+       (String.compare name "digraph" = 0) then
+      String.concat "" ["escaped_"; name]
+    else
+      name in
+  Format.fprintf fmt "digraph %s {@." escaped_name;
+  Format.fprintf fmt "  graph [ratio=0.5]@.";
+  Format.fprintf fmt "  node [style=filled]@.";
+  let rec print_graph_bfs depth root =
+      if depth <= 0
+      then ()
+      else if depth = 1
+      then print_node root
+      else
+          let next_nodes = G.succ graph root in
+          let out_edges = G.succ_e graph root in
+          print_node root;
+          List.iter (print_graph_bfs (depth - 1)) next_nodes;
+          List.iter print_edge out_edges
+  in
+  match find_vertex_by_name graph root with
+  | Some root_vtx ->
+      print_graph_bfs depth root_vtx;
+      print_subgraphs fmt subgraphs;
+      Format.fprintf fmt "} /* END */@."
+  | None ->
+      raise Not_found
+
 
 let graph_file graphname filename g =
   let file, oc =
@@ -191,4 +249,17 @@ let graph_file graphname filename g =
   in C.feedback "Graph output in %s@." file;
      let fmt = Format.formatter_of_out_channel oc in
        print_graph graphname fmt g;
+       close_out oc
+
+
+let graph_file_bfs graphname filename g root depth =
+  let file, oc =
+    try filename, open_out filename
+    with Sys_error msg ->
+      C.warning "cannot open file: %s@." msg;
+      let file = Filename.temp_file "coqdpd" ".dpd" in
+        file, open_out file
+  in C.feedback "Graph output in %s@." file;
+     let fmt = Format.formatter_of_out_channel oc in
+       print_graph_from graphname fmt g root depth;
        close_out oc
