@@ -24,6 +24,7 @@ config.status
 
 coqthmdep
 dpd2dot
+dpdall
 dpdusage
 Make_coq
 CoqMakefile.conf
